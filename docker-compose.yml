@@ -1,0 +1,132 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: jobsdb
+      POSTGRES_USER: jobs
+      POSTGRES_PASSWORD: jobs_pw
+    ports:
+      - "15432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobs -d jobsdb"]
+      interval: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  job-posting-service:
+    build: ./services/job-posting-service
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://jobs:jobs_pw@postgres:5432/jobsdb
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  job-search-service:
+    build: ./services/job-search-service
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgres://jobs:jobs_pw@postgres:5432/jobsdb
+      MONGO_URL: mongodb://mongo:27017/jobsearch
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  notification-service:
+    build: ./services/notification-service
+    environment:
+      PORT: 3003
+      MONGO_URL: mongodb://mongo:27017/notifications
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      JOB_POSTING_URL: http://job-posting-service:3001
+      JOB_SEARCH_URL: http://job-search-service:3002
+      INTERNAL_SECRET: dev-internal-secret
+      NODE_ENV: development
+    ports:
+      - "3003:3003"
+    depends_on:
+      mongo:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+
+  ai-agent-service:
+    build: ./services/ai-agent-service
+    environment:
+      PORT: 3004
+      JOB_SEARCH_URL: http://job-search-service:3002
+      JOB_POSTING_URL: http://job-posting-service:3001
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      NODE_ENV: development
+    ports:
+      - "3004:3004"
+
+  api-gateway:
+    build: ./services/api-gateway
+    environment:
+      PORT: 8080
+      JOB_POSTING_URL: http://job-posting-service:3001
+      JOB_SEARCH_URL: http://job-search-service:3002
+      NOTIFICATION_URL: http://notification-service:3003
+      AI_AGENT_URL: http://ai-agent-service:3004
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-dev-secret}
+      NODE_ENV: development
+    ports:
+      - "8080:8080"
+    depends_on:
+      - job-posting-service
+      - job-search-service
+      - notification-service
+      - ai-agent-service
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE: http://localhost:8080
+    ports:
+      - "5180:5180"
+    depends_on:
+      - api-gateway
+
+volumes:
+  pg_data:
+  mongo_data:
