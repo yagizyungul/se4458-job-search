@@ -1,0 +1,179 @@
+# Render Blueprint — deploys all microservices + DBs + frontend in one click.
+#
+# Setup (in Render dashboard):
+# 1. New + → Blueprint → connect this GitHub repo → Apply
+# 2. Render asks for values for env vars marked `sync: false` — paste:
+#    - GEMINI_API_KEY (from your Google AI Studio)
+#    - MONGO_URL (from MongoDB Atlas — see README)
+#    - RABBITMQ_URL (from CloudAMQP — see README)
+#    - SUPABASE_JWT_SECRET (any random string for dev; real Supabase JWT secret for prod)
+# 3. Wait ~10 minutes for first deploy.
+
+databases:
+  - name: jobs-postgres
+    plan: free
+    databaseName: jobsdb
+    user: jobs
+
+services:
+  # ---------------- Cache ----------------
+  - type: keyvalue
+    name: jobs-redis
+    plan: free
+    ipAllowList: []  # allow only internal access
+
+  # ---------------- Job Posting (admin CRUD) ----------------
+  - type: web
+    name: job-posting-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/job-posting-service/Dockerfile
+    dockerContext: ./services/job-posting-service
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jobs-postgres
+          property: connectionString
+      - key: PG_SSL
+        value: "true"
+      - key: REDIS_URL
+        fromService:
+          name: jobs-redis
+          type: keyvalue
+          property: connectionString
+      - key: RABBITMQ_URL
+        sync: false
+
+  # ---------------- Job Search (read + autocomplete) ----------------
+  - type: web
+    name: job-search-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/job-search-service/Dockerfile
+    dockerContext: ./services/job-search-service
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jobs-postgres
+          property: connectionString
+      - key: PG_SSL
+        value: "true"
+      - key: REDIS_URL
+        fromService:
+          name: jobs-redis
+          type: keyvalue
+          property: connectionString
+      - key: MONGO_URL
+        sync: false
+
+  # ---------------- Notification (job alerts, scheduled tasks) ----------------
+  - type: web
+    name: notification-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/notification-service/Dockerfile
+    dockerContext: ./services/notification-service
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URL
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false
+      - key: INTERNAL_SECRET
+        generateValue: true
+      - key: JOB_POSTING_URL
+        fromService:
+          name: job-posting-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: JOB_SEARCH_URL
+        fromService:
+          name: job-search-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  # ---------------- AI Agent (Gemini chat) ----------------
+  - type: web
+    name: ai-agent-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/ai-agent-service/Dockerfile
+    dockerContext: ./services/ai-agent-service
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash
+      - key: JOB_POSTING_URL
+        fromService:
+          name: job-posting-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: JOB_SEARCH_URL
+        fromService:
+          name: job-search-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  # ---------------- API Gateway (entry point) ----------------
+  - type: web
+    name: api-gateway
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/api-gateway/Dockerfile
+    dockerContext: ./services/api-gateway
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: JOB_POSTING_URL
+        fromService:
+          name: job-posting-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: JOB_SEARCH_URL
+        fromService:
+          name: job-search-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: NOTIFICATION_URL
+        fromService:
+          name: notification-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: AI_AGENT_URL
+        fromService:
+          name: ai-agent-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  # ---------------- Frontend (static site) ----------------
+  - type: web
+    name: frontend
+    runtime: static
+    rootDir: ./frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE
+        fromService:
+          name: api-gateway
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
