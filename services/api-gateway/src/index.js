@@ -30,11 +30,21 @@ const targets = {
 const proxy = (target) => createProxyMiddleware({
   target,
   changeOrigin: true,
-  onProxyReq: (proxyReq, req) => {
-    if (req.user) {
-      proxyReq.setHeader('X-User-Id', req.user.sub);
-      proxyReq.setHeader('X-User-Role', req.user.role || 'user');
-    }
+  pathRewrite: (_path, req) => req.originalUrl,
+  on: {
+    proxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.sub);
+        proxyReq.setHeader('X-User-Role', req.user.role || 'user');
+      }
+    },
+    error: (err, _req, res) => {
+      console.error('[gateway-proxy-error]', err.message);
+      if (res && !res.headersSent) {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Upstream service unavailable', detail: err.message }));
+      }
+    },
   },
 });
 
