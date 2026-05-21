@@ -16,13 +16,26 @@ export default function Home() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        () => { /* would reverse geocode here */ },
-        () => {},
-        { timeout: 1500 },
-      );
-    }
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const url = `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&accept-language=en`;
+          const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+          if (!r.ok) return;
+          const data = await r.json();
+          const detected = data.address?.city
+            || data.address?.town
+            || data.address?.county
+            || data.address?.state;
+          if (detected) setCity(detected);
+        } catch {
+          // silently fall back to DEFAULT_CITY
+        }
+      },
+      () => { /* user denied, keep default */ },
+      { timeout: 4000, maximumAge: 600000 },
+    );
   }, []);
 
   useEffect(() => {

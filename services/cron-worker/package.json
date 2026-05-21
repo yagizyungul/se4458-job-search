@@ -1,0 +1,10 @@
+{
+  "name": "cron-worker",
+  "version": "1.0.0",
+  "description": "Tiny worker that triggers notification scheduled tasks via HTTP",
+  "type": "module",
+  "main": "trigger.js",
+  "scripts": {
+    "start": "node trigger.js"
+  }
+}

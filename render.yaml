@@ -173,7 +173,59 @@ services:
           name: api-gateway
           type: web
           envVarKey: RENDER_EXTERNAL_URL
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  # ---------------- Cron: trigger job-alerts pipeline ----------------
+  # Runs every 15 minutes; pulls new job postings from RabbitMQ,
+  # matches user alerts, queues notifications.
+  - type: cron
+    name: cron-job-alerts
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/cron-worker/Dockerfile
+    dockerContext: ./services/cron-worker
+    schedule: "*/15 * * * *"
+    envVars:
+      - key: TARGET_URL
+        fromService:
+          name: notification-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: INTERNAL_SECRET
+        fromService:
+          name: notification-service
+          type: web
+          envVarKey: INTERNAL_SECRET
+      - key: ENDPOINT
+        value: /api/v1/internal/run-job-alerts
+
+  # ---------------- Cron: related-jobs daily digest ----------------
+  # Runs at 02:00 UTC every day; scans user searches and sends
+  # related job notifications.
+  - type: cron
+    name: cron-related-jobs
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/cron-worker/Dockerfile
+    dockerContext: ./services/cron-worker
+    schedule: "0 2 * * *"
+    envVars:
+      - key: TARGET_URL
+        fromService:
+          name: notification-service
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: INTERNAL_SECRET
+        fromService:
+          name: notification-service
+          type: web
+          envVarKey: INTERNAL_SECRET
+      - key: ENDPOINT
+        value: /api/v1/internal/run-related-jobs
