@@ -9,11 +9,13 @@ A microservices-based job search web application similar to kariyer.net.
 
 ## Live Deployment URLs
 
-> Deploy edildikten sonra bu kısım güncellenecek.
+- **Frontend (UI):** https://frontend-k1lq.onrender.com
+- **API Gateway:** https://api-gateway-pg76.onrender.com
+- **API health check:** https://api-gateway-pg76.onrender.com/health
+- **Sample API call:** https://api-gateway-pg76.onrender.com/api/v1/jobs?city=Istanbul&pageSize=5
+- **Demo Video:** *(video link buraya — kayıt sonrası eklenecek)*
 
-- **Frontend (UI):** `https://job-search-frontend.azurewebsites.net`
-- **API Gateway:** `https://job-search-gateway.azurewebsites.net`
-- **Demo Video:** `https://youtu.be/<your-video-id>` (max 5 dakika)
+> Note: Hosted on Render free tier — services spin down after 15 min of inactivity. First request after sleep may take 30-60s to wake up.
 
 ## Architecture
 
