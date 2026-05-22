@@ -13,7 +13,7 @@ A microservices-based job search web application similar to kariyer.net.
 - **API Gateway:** https://api-gateway-pg76.onrender.com
 - **API health check:** https://api-gateway-pg76.onrender.com/health
 - **Sample API call:** https://api-gateway-pg76.onrender.com/api/v1/jobs?city=Istanbul&pageSize=5
-- **Demo Video:** *(video link buraya — kayıt sonrası eklenecek)*
+- **Demo Video:** https://drive.google.com/file/d/1GE86hjtJE4N9tEMUCKcLNqltN9zXA2IE/view?usp=sharing
 
 > Note: Hosted on Render free tier — services spin down after 15 min of inactivity. First request after sleep may take 30-60s to wake up.
 
