@@ -139,6 +139,10 @@ services:
         value: production
       - key: SUPABASE_JWT_SECRET
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
       - key: JOB_POSTING_URL
         fromService:
           name: job-posting-service
