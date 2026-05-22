@@ -107,7 +107,7 @@ function toGeminiContents(messages) {
 
 async function callGemini(contents) {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {
