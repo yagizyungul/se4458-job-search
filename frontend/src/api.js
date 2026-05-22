@@ -1,6 +1,13 @@
+import { supabase, supabaseEnabled } from './supabase.js';
+
 const BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
-function authHeaders() {
+async function authHeaders() {
+  if (supabaseEnabled) {
+    const { data } = await supabase.auth.getSession();
+    const tok = data?.session?.access_token;
+    if (tok) return { Authorization: `Bearer ${tok}` };
+  }
   const t = localStorage.getItem('token');
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
@@ -8,7 +15,7 @@ function authHeaders() {
 async function request(path, opts = {}) {
   const headers = {
     'Content-Type': 'application/json',
-    ...authHeaders(),
+    ...(await authHeaders()),
     ...(opts.headers || {}),
   };
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });

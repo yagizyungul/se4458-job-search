@@ -22,7 +22,9 @@ export default function App() {
           {user && <Link to="/alerts">Iş Alarmı</Link>}
           {user?.role === 'admin' || user?.role === 'company' ? <Link to="/admin">Admin</Link> : null}
           {user ? (
-            <a onClick={() => { logout(); navigate('/'); }} style={{ cursor: 'pointer' }}>Çıkış ({user.userId})</a>
+            <a onClick={async () => { await logout(); navigate('/'); }} style={{ cursor: 'pointer' }}>
+              Çıkış ({user.email || user.userId})
+            </a>
           ) : (
             <Link to="/login">Giriş</Link>
           )}

@@ -3,9 +3,23 @@ import jwt from 'jsonwebtoken';
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'dev-secret';
 const isDev = process.env.NODE_ENV !== 'production';
 
+// Extract application role from a Supabase JWT.
+// Supabase puts the Postgres role (e.g., "authenticated") in `role`, which is
+// NOT our app role. The app role is stored where we saved it at signup time:
+// app_metadata.role (preferred, server-set) or user_metadata.role (client-set).
+function extractAppRole(decoded) {
+  return (
+    decoded.app_metadata?.role
+    || decoded.user_metadata?.role
+    || 'user'
+  );
+}
+
 function parseToken(token) {
+  // Dev token shortcut for local development only.
   if (isDev && token.startsWith('dev-')) {
-    const [, role, userId] = token.split('-');
+    const [, role, ...userIdParts] = token.split('-');
+    const userId = userIdParts.join('-');
     if (!role || !userId) return null;
     return { sub: userId, role };
   }
@@ -13,7 +27,8 @@ function parseToken(token) {
     const decoded = jwt.verify(token, SUPABASE_JWT_SECRET);
     return {
       sub: decoded.sub,
-      role: decoded.role || decoded.app_metadata?.role || 'user',
+      role: extractAppRole(decoded),
+      email: decoded.email,
     };
   } catch {
     return null;
